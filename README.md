@@ -121,7 +121,7 @@ Button : component {
         $classes := []
         $classes[] = $config.namespace
         $classes[] = $kind
-        $classes[] = $size
+        $classes[] = $width
 
         // NOTE: Implicitly explode array into string for "class" property.
         //       Might be exposed as function so you can explictily do "array.toClassString()"
@@ -169,15 +169,17 @@ html {
             $footerWidths := Button.Width.fullWidth
 
             div {
-                Button(kind=primary) {
-
+                Button(kind=primary, type=reset) {
+                    "Clear"
                 }
-                Button(kind=secondary, size=fullWidth, type=submit){
+                Button(kind=secondary, width=fullWidth, type=submit){
                     "Submit"
                 }
             }
             footer {
-                Button(size=$footerWidths)
+                Button(width=$footerWidths) {
+                    "Open Something Cool!"
+                }
             }
         }
     }
