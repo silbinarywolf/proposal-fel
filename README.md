@@ -27,20 +27,22 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
 - A component must begin with a captial letter.
     - Reasoning: Make it clear when using a regular tag vs a component, ie. "div" vs "Div"
 - Keywords: (These can be escaped with a \\, ie, if you want a HTML element called "if", do \\if)
-    - def
-    - style (also a tagName)
-    - stylerules
-    - html (also a tagName)
-    - script (also a tagName)
-    - config 
-    - properties
-    - children
-    - import
-
-    Control flow:
+    - Top Level or Def
+        - style (also a tagName)
+        - html (also a tagName)
+        - script (also a tagName)
+        - stylerules
+        - config 
+    - Top Level 
+        - import
+    - Def
+        - properties
+    - HTML Block:
+        - children
+    - Control flow:
         - if
         - for (do the Golang thins, one keyword for looping)
-    Types:
+    - Types:
         - string
         - enum
         - int (64-bit integer)
