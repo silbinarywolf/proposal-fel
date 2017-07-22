@@ -27,6 +27,15 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
     - ie. $get_posts() in PHP will output `<?php get_posts(); ?>`
     - ie. $this.props.value in JavaScript will output `this.props.value`
 
+## Roadmap plan:
+
+To avoid constantly increasing scope and never properly finish implementing features, the following link 
+shows my plan for features and what version numbers they'll be at.
+
+This will be updated as I go.
+
+(ROADMAP.md)[Roadmap]
+
 ## Rules
 - A component must begin with a captial letter.
     - Reasoning: Make it clear when using a regular tag vs a component, ie. "div" vs "Div"
@@ -59,6 +68,9 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
             - false
             - true
         - type\[\] (Array of type)
+        - interop
+            - this is essentially a $ variable that can't be known about 
+              at compile time. Unfortunately a "mixed" type. 
 
 ## Reusable Components
 
@@ -198,6 +210,18 @@ html {
 }
 ```
 
+## Example code structure in directory
+
+```
+- /project_folder/
+    - /fel/
+        - /components/
+        - /templates/
+        - config.fel
+    - /css/
+    - /templates/
+```
+
 ## Config
 
 ```cpp
@@ -215,10 +239,14 @@ config {
     //
     namespaceDir := 'modules'
 
-    cssOutputDir := 'app/css/'
+    cssOutputDir := '../css'
 
     // Idea: You can target a backend language to output to
     backendLanguage := Language.PHP // ie. Language.HTML, Language.JavaScript
+
+    // NOTE(Jake): Where to output HTML / PHP / JavaScript, depending on `backendLanguage`
+    //             This is a 1-1 mapping, so if you made "Page.fel" it would output in /templates/Page.php
+    templateOutputDir := '../templates'
 
     // Idea: Inspired by Brunch, declare where you want CSS of specific modules/components to be output to.
     //
