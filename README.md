@@ -4,13 +4,16 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
 
 ## Goals:
 
+- A coupled replacement for Twig and SASS, combined into one compiler.
+    - We are *not* thinking too hard about JavaScript integration with components yet.
 - Fast and simple analysis of unused CSS selectors and optional optimization.
     - Optimization ideas:
         - Reduce CSS selector string sizes (where not marked for use in JavaScript)
         - Completely remove unused rules from output and/or warn about them
 - Easy to reuse components using a functional programming paradigm.
-- Can be used standalone (ie. generate static HTML) and can integrate seamlessly with other engines / templating code.
+- Can be used standalone (ie. generate static HTML) and can integrate seamlessly with other build systems (ie. Brunch, Webpack)
 - Define and detect browser bugs at compile-time.
+    - ie. If you're targetting IE8, it'll warn about CSS
 
 ## Parsing Logic:
 - Semicolons (;) optional. This will be achieved by making newlines act as a statement terminator. (Like Golang)
@@ -20,28 +23,33 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
     - " (regular strings)
     - ' (will either be unused, or work like C/Golang, ie. single character byte)
     - ` (for style/script data or inline HTML)
-- Variables are prefixed with $.
-    - This decision is to avoid name clashes with constants/enums and variables.
+- Identifiers declared with $ are backend interopable variables / functions.
+    - ie. $get_posts() in PHP will output `<?php get_posts(); ?>`
+    - ie. $this.props.value in JavaScript will output `this.props.value`
 
 ## Rules
 - A component must begin with a captial letter.
     - Reasoning: Make it clear when using a regular tag vs a component, ie. "div" vs "Div"
 - Keywords: (These can be escaped with a \\, ie, if you want a HTML element called "if", do \\if)
-    - Top Level or Def
+    - Top Level or Component
         - style (also a tagName)
         - html (also a tagName)
         - script (also a tagName)
-        - stylerules
+        - styleflags
         - config 
     - Top Level 
         - import
-    - Def
+    - Component
         - properties
     - HTML Block:
         - children
     - Control flow:
         - if
-        - for (do the Golang thins, one keyword for looping)
+        - for (do the Golang thing, one keyword for looping)
+            - This will probably be in line with Silverstripe/Twig loops, which implicitly
+              uses the scope of the current item.
+    - Browser Def
+        - vendorprefix
     - Types:
         - string
         - enum
@@ -56,12 +64,6 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
 
 ```cpp
 Button : component {
-    config {
-        namespace := 'btn' // (optional, will default to component name, ie. "Button")
-        // NOTE: Might want to make a `Colors` enum for standard lib.
-        primaryColor := "red"
-    }
-
     Kind : enum {
         primary: "primary"
         secondary: "secondary"
@@ -80,13 +82,20 @@ Button : component {
     
     // NOTE: properties default to first item in enum, unless explicitly set.
     properties {
-        $kind: Kind
-        $type: Type
-        $width: Width = full
+        // NOTE(Jake): Might add a "private"/"readonly"/"unsupported" block so you can declare some properties
+        //             as unsupported. This will mean users *can* change the values but it'll cause a compile 
+        //             warning saying "[x] property is unsupported and future updates might break this component"
+        namespace := 'btn' // (optional, will default to component name, ie. "Button")
+        primaryColor := "red" // NOTE: Might want to make a `Colors` enum for standard lib.
+
+        kind: Kind
+        type: Type
+        width: Width = full
     }
 
-    style {`
-        .$config.namespace {
+    style {
+        // NOTE(Jake): Access component properties in a CSS4 variables way.
+        var(--namespace) {
 
         }
 
@@ -103,29 +112,29 @@ Button : component {
         .primary.is-active {
             // ...
         }
-    `}
+    }
 
     // Idea: Add special compile hints to CSS selectors, one idea might be to
     //       restrict CSS properties to a list of enumerated values to catch improperly
     //       set values.
-    stylerules {
+    styleflags {
         .is-active {
-            // Idea: This will keep the selector name in-tact and 
-            //       not attempt deadcode elimination / throw warnings.
-            //       A better name might be "alwaysKeep" or "usedExternally".
-            inJavaScript := true
+            // NOTE(Jake): Tells the compiler to not optimize this out or change it's name. This is so
+            //             the classname can be used in JavaScript and so the CSS rules aren't optimized out 
+            //             if unused.
+            dontModify := true
         }
     }
 
     html {
-        $classes := []
-        $classes[] = $config.namespace
-        $classes[] = $kind
-        $classes[] = $width
+        classes := []
+        classes[] = namespace
+        classes[] = kind
+        classes[] = width
 
         // NOTE: Implicitly explode array into string for "class" property.
         //       Might be exposed as function so you can explictily do "array.toClassString()"
-        button(class = $classes, type=$type) {
+        button(class = classes, type=type) {
             children // will insert child nodes here
         }
     }
@@ -134,13 +143,14 @@ Button : component {
 
 ```cpp
 Normalize : component {
-    config {
-        namespace := '' // do not namespace CSS selectors
+    properties {
+        namespace := '' // do not namespace CSS selectors as this is a global
+                        // stylesheet
     }
 
-    // Imagine a typical normalize.css file here
-    style {`
-    `}
+    style {
+        // Imagine a typical normalize.css file here
+    }
 }
 ```
 
@@ -166,18 +176,20 @@ html {
             `}
         }
         body {
-            $footerWidths := Button.Width.fullWidth
+            footerWidths := Button.Width.fullWidth
 
             div {
                 Button(kind=primary, type=reset) {
                     "Clear"
                 }
-                Button(kind=secondary, width=fullWidth, type=submit){
+                // NOTE(Jake): Because these params are for a `Button` component, you don't need 
+                //             to do "Button.Kind.secondary" (though you could), you can just do "Kind.secondary"
+                Button(kind=Kind.secondary, width=Width.fullWidth, type=Type.submit){
                     "Submit"
                 }
             }
             footer {
-                Button(width=$footerWidths) {
+                Button(width=footerWidths) {
                     "Open Something Cool!"
                 }
             }
@@ -205,7 +217,14 @@ config {
 
     cssOutputDir := 'app/css/'
 
+    // Idea: You can target a backend language to output to
+    backendLanguage := Language.PHP // ie. Language.HTML, Language.JavaScript
+
     // Idea: Inspired by Brunch, declare where you want CSS of specific modules/components to be output to.
+    //
+    //       If you are actually using another build system with this like Webpack/Brunch, perhaps the CSS output
+    //       can be configured at that level.
+    //
     cssFiles := [
         'normalize.css' := [
             Normalize
@@ -216,22 +235,35 @@ config {
     // Idea: Define target browsers so 'stylerules' can be applied to warn of browser bugs as well as generate
     //       vendor prefixes for properties.
     targetBrowsers := Browser.IE >= 10 && Browser.Safari > 8
+}
+```
 
-    // Idea: CSS preprocessor middleware, this will:
-    //          - Naively replace "$config.namespace" with your namespace string. ie. .$config.namespace {} becomes .btn {}
-    //          - Run it through an external library or executable.
-    //          - Take output CSS and parse into AST for FEL, so it can deadcode check, etc. 
-    //
-    //       This idea might be completely moot if we just make the FEL CSS language really good on its own merits.
-    //       Problems with this include:
-    //          - Can't easily redistribute a component that requires SASS/LESS/Stylus/etc.
-    //          - Not sure how to pass configuration values to compiler SASS. ie. I can't configure a Bootstrap buttons primary color.
-    //          - Slow down compilation time.
-    //          - Unable to properly handle error messages, could cause JavaScript Transpilation-levels of obtuse-errors.
-    //
-    cssMiddleware := [
-        sass_compiler
-    ]
+## Browser Rules / Vendor Prefixes
+```
+if Browser.Safari < 9 {
+    // NOTE(Jake): Declare vendor prefixes based on browser being targetted
+    vendorprefix {
+        transition: -webkit-transition
+    }
+}
+```
+
+## Language Definition
+
+The language will come with a few standard language definition files to allow configuration of backend interoperation.
+It's unclear how this should look so far so to begin with language support will probably be hardcoded into the code generation
+part of the compiler.
+
+```
+HTML :: language {
+    supportInterop: false
 }
 
+PHP :: language {
+    supportInterop: true
+}
+
+JavaScript :: language {
+    supportInterop: true
+}
 ```
