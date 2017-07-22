@@ -34,7 +34,7 @@ shows my plan for features and what version numbers they'll be at.
 
 This will be updated as I go.
 
-(ROADMAP.md)[Roadmap]
+[Roadmap](ROADMAP.md)
 
 ## Rules
 - A component must begin with a captial letter.
