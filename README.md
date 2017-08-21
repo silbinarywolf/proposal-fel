@@ -21,8 +21,8 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
 - Parameters can be seperated by , or \n, but not both at the same time.
 - Strings can be represented with: 
     - " (regular strings)
-    - ' (will either be unused, or work like C/Golang, ie. single character byte)
-    - ` (for style/script data or inline HTML)
+    - """ (for heredoc strings, ie. style/script data or inline HTML)
+    - ' (banned except for in CSS for now)
 - Identifiers declared with $ are backend interopable variables / functions.
     - ie. $get_posts() in PHP will output `<?php get_posts(); ?>`
     - ie. $this.props.value in JavaScript will output `this.props.value`
