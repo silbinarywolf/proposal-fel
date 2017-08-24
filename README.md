@@ -61,7 +61,7 @@ This will be updated as I go.
 
 ## Reusable Components
 
-```cpp
+```c
 Button :: html {
     Kind :: enum {
         primary: "primary"
@@ -138,7 +138,7 @@ Button :: html {
 }
 ```
 
-```cpp
+```c
 Normalize :: css {
     // Imagine a typical normalize.css file here
 }
@@ -146,7 +146,7 @@ Normalize :: css {
 
 ## Templates
 
-```cpp
+```c
 html {
     head {
         meta(name="viewport", content="width=device-width")
@@ -200,7 +200,7 @@ html {
 
 ## Config
 
-```cpp
+```c
 // Idea: You can put a heap of Bootstrap components in a 'Bootstrap' folder
 //       which will automatically namespace each object so you have to do "Bootstrap.Button".
 //
