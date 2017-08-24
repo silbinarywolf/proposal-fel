@@ -40,24 +40,12 @@ This will be updated as I go.
 - A component must begin with a captial letter.
     - Reasoning: Make it clear when using a regular tag vs a component, ie. "div" vs "Div"
 - Keywords: (These can be escaped with a \\, ie, if you want a HTML element called "if", do \\if)
-    - Top Level or Component
-        - style (also a tagName)
-        - html (also a tagName)
-        - script (also a tagName)
-        - styleflags
-    - Top Level 
-        - import
-    - Component
-        - properties
-    - HTML Block:
-        - children
+    - import
     - Control flow:
         - if
         - for (do the Golang thing, one keyword for looping)
             - This will probably be in line with Silverstripe/Twig loops, which implicitly
               uses the scope of the current item.
-    - Browser Def
-        - vendorprefix
     - Types:
         - string
         - enum
@@ -74,25 +62,25 @@ This will be updated as I go.
 ## Reusable Components
 
 ```cpp
-Button : component {
-    Kind : enum {
+Button :: html {
+    Kind :: enum {
         primary: "primary"
         secondary: "secondary"
     }
 
-    Type : enum {
+    Type :: enum {
         button: "button"
         submit: "submit"
         reset: "reset"
     }
 
-    Width : enum {
+    Width :: enum {
         auto
         full: "full-width"
     }
     
     // NOTE: properties default to first item in enum, unless explicitly set.
-    properties {
+    :: properties {
         // NOTE(Jake): Might add a "private"/"readonly"/"unsupported" block so you can declare some properties
         //             as unsupported. This will mean users *can* change the values but it'll cause a compile 
         //             warning saying "[x] property is unsupported and future updates might break this component"
@@ -104,7 +92,7 @@ Button : component {
         width: Width = full
     }
 
-    style {
+    :: css {
         // NOTE(Jake): Access component properties in a CSS4 variables way.
         var(--namespace) {
 
@@ -128,40 +116,31 @@ Button : component {
     // Idea: Add special compile hints to CSS selectors, one idea might be to
     //       restrict CSS properties to a list of enumerated values to catch improperly
     //       set values.
-    styleflags {
+    :: css_rules {
         .is-active {
             // NOTE(Jake): Tells the compiler to not optimize this out or change it's name. This is so
             //             the classname can be used in JavaScript and so the CSS rules aren't optimized out 
             //             if unused.
-            dontModify := true
+            dont_modify := true
         }
     }
 
-    html {
-        classes := []
-        classes[] = namespace
-        classes[] = kind
-        classes[] = width
+    classes := []
+    classes[] = namespace
+    classes[] = kind
+    classes[] = width
 
-        // NOTE: Implicitly explode array into string for "class" property.
-        //       Might be exposed as function so you can explictily do "array.toClassString()"
-        button(class = classes, type=type) {
-            children // will insert child nodes here
-        }
+    // NOTE: Implicitly explode array into string for "class" property.
+    //       Might be exposed as function so you can explictily do "array.toClassString()"
+    button(class=classes, type=type) {
+        children // will insert child nodes here
     }
 }
 ```
 
 ```cpp
-Normalize : component {
-    properties {
-        namespace := '' // do not namespace CSS selectors as this is a global
-                        // stylesheet
-    }
-
-    style {
-        // Imagine a typical normalize.css file here
-    }
+Normalize :: css {
+    // Imagine a typical normalize.css file here
 }
 ```
 
@@ -186,7 +165,7 @@ html {
         `}
     }
     body {
-        footerWidths := Button.Width.fullWidth
+        footer_widths := Button.Width.full
 
         div {
             Button(kind=primary, type=reset) {
@@ -194,12 +173,12 @@ html {
             }
             // NOTE(Jake): Because these params are for a `Button` component, you don't need 
             //             to do "Button.Kind.secondary" (though you could), you can just do "Kind.secondary"
-            Button(kind=Kind.secondary, width=Width.fullWidth, type=Type.submit){
+            Button(kind=Kind.secondary, width=Width.full, type=Type.submit){
                 "Submit"
             }
         }
         footer {
-            Button(width=footerWidths) {
+            Button(width=footer_widths) {
                 "Open Something Cool!"
             }
         }
@@ -212,7 +191,7 @@ html {
 ```
 - /project_folder/
     - /fel/
-        - /components/
+        - /includes/
         - /templates/
         - config.fel
     - /css/
@@ -222,26 +201,22 @@ html {
 ## Config
 
 ```cpp
-import (
-    Normalize
-)
-
 // Idea: You can put a heap of Bootstrap components in a 'Bootstrap' folder
 //       which will automatically namespace each object so you have to do "Bootstrap.Button".
 //
 //       However, I feel you generally just want to be able to use any component in your project without
 //       worrying about namespaces for the most part, so not sure how necessary this would be.
 //
-namespaceDirectory := 'modules'
+namespace_directory := 'modules'
 
-cssOutputDirectory := '../css'
+css_output_directory := '../css'
 
 // Idea: You can target a backend language to output to
-backendLanguage := Language.PHP // ie. Language.HTML, Language.JavaScript
+backend_language := Language.PHP // ie. Language.HTML, Language.JavaScript
 
 // NOTE(Jake): Where to output HTML / PHP / JavaScript, depending on `backendLanguage`
 //             This is a 1-1 mapping, so if you made "Page.fel" it would output in /templates/Page.php
-templateDirectory := {
+template_directory := {
     "templates": "../templates"
 }
 
@@ -250,35 +225,32 @@ templateDirectory := {
 //       If you are actually using another build system with this like Webpack/Brunch, perhaps the CSS output
 //       can be configured at that level.
 //
-cssFiles := [
+css_files := [
     "normalize.css": [
         Normalize
     ],
     "main.css": [] // empty array implies put in all CSS that isn't placed elsewhere.
 ]
 
-// Idea: Define target browsers so 'stylerules' can be applied to warn of browser bugs as well as generate
+// Idea: Define target browsers so 'css_rules' can be applied to warn of browser bugs as well as generate
 //       vendor prefixes for properties.
 Browser := {
-    InternetExplorer: 9,
-    Edge: 
+    Internet_Explorer: 9,
+    Edge: 14,
+    Safari: 8,
+    Safari_IOS: 10,
+    Chrome: 60,
+    Chrome_Android: 59,
+    Opera: 30,
+    Firefox: 54,
 }
-Browser.InternetExplorer = 9
-Browser.Edge = 14
-Browser.Safari = 8
-Browser.SafariIOS = 10
-Browser.Chrome = 60
-Browser.ChromeAndroid = 59
-Browser.Opera
-Browser.Firefox = 54
-Browser.Firefox = 54
 ```
 
 ## Browser Rules / Vendor Prefixes
 ```
 if Browser.Safari < 9 {
     // NOTE(Jake): Declare vendor prefixes based on browser being targetted
-    vendorprefix {
+    :: css_vendor_prefix {
         transition: -webkit-transition
     }
 }
@@ -293,14 +265,14 @@ part of the compiler.
 
 ```
 HTML :: language {
-    supportInterop: false
+    support_interop: false
 }
 
 PHP :: language {
-    supportInterop: true
+    support_interop: true
 }
 
 JavaScript :: language {
-    supportInterop: true
+    support_interop: true
 }
 ```
