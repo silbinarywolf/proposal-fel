@@ -13,15 +13,20 @@
 - [x] Update Scanner to store lexing errors (return token.EOF if hits one)
 
 ## v0.3
-- Add CSS support (lexer/parsing/output)
+- [x] Add CSS support (lexer/parsing/output)
 
 ## v0.4 
-- Add component support
+- [x] Add component support
 
 ## v0.5
-- Add basic optimization pass (ie. CSS rules will be omitted if they do not exist)
+- [x] Add basic optimization pass (ie. *some* CSS rules will be omitted if they do not exist)
+
+## v0.6
+- Change attribute storage of classes on HTMLNode to be a "classList", rework attributes.
+- Add support for ":: css_rules" blocks (so you can disable namespacing on certain selectors, etc)
+- Add more optimization support for CSS (attribute matching, tag name matching)
 
 ## v0.x
 - Add CSS element and property checking based on configuration file
 	- ie. if you use "font-family", you'll get no error, if you use "font-famlee", you will get "CSS property is not defined" error.
-
+- Add if / for-loop support
