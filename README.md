@@ -9,16 +9,16 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
 - Fast and simple analysis of unused CSS selectors and optional optimization.
     - Optimization ideas:
         - Reduce CSS selector string sizes (where not marked for use in JavaScript)
+            - ie. Transform ".Button_primary" to ".x45dt"
         - Completely remove unused rules from output and/or warn about them
-- Easy to reuse components using a functional programming paradigm.
-- Can be used standalone (ie. generate static HTML) and can integrate seamlessly with other build systems (ie. Brunch, Webpack)
-- Define and detect browser bugs at compile-time.
-    - ie. If you're targetting IE8, it'll warn about CSS
+- Easy to reuse pure components
+- Can be used standalone (ie. generate static HTML) and can integrate seamlessly with other build systems (ie. Webpack, Laravel Mix, Brunch)
+- (Maybe) Define and detect browser bugs at compile-time.
+    - ie. If detect "display: inline-block;" requires a hack for IE6/IE7.
 
 ## Parsing Logic:
 - Semicolons (;) optional. This will be achieved by making newlines act as a statement terminator. (Like Golang)
 - Colons (:) used to mean 'declare' and colon equals (:=) means infer type from right-hand expression. (Like Golang)
-- Parameters can be seperated by , or \n, but not both at the same time.
 - Strings can be represented with: 
     - " (regular strings)
     - """ (for heredoc strings, ie. style/script data or inline HTML)
@@ -37,69 +37,68 @@ This will be updated as I go.
 [Roadmap](ROADMAP.md)
 
 ## Rules
-- A component must begin with a captial letter.
-    - Reasoning: Make it clear when using a regular tag vs a component, ie. "div" vs "Div"
 - Keywords: (These can be escaped with a \\, ie, if you want a HTML element called "if", do \\if)
     - import
     - Control flow:
         - if
         - for (do the Golang thing, one keyword for looping)
             - This will probably be in line with Silverstripe/Twig loops, which implicitly
-              uses the scope of the current item.
+              uses the scope of the current item, but not sure. Might have something like:
+              "for MyList {" wherein you access properties with "it.Name"
+
+              Reasoning for this is so that when reading the code, you immediately know 
+              if the code your reading is in a "for" loop context. Also means you dont need special "top" or "up"
+              variables to access parent scopes.
     - Types:
         - string
         - enum
-        - int (64-bit integer)
-        - float (64-bit floating point, a double)
+        - int (defaults to highest integer type for that operating system, most likely 64-bit)
+        - float (defaults to highest floating point type for that operating system, most likely 64-bit)
         - bool
             - false
             - true
         - type\[\] (Array of type)
         - interop
             - this is essentially a $ variable that can't be known about 
-              at compile time. Unfortunately a "mixed" type. 
+              at compile time. Unfortunately a "mixed"/"any" type.
+
+## Conventions
+- A component should begin with a captial letter
+    - Reasoning: Make it clearer when using a regular tag vs a component, ie. "button" vs "Button"
+                 and less likely to clash with potential future elements.
 
 ## Reusable Components
 
 ```c
 Button :: html {
-    Kind :: enum {
-        primary: "primary"
-        secondary: "secondary"
-    }
-
-    Type :: enum {
-        button: "button"
-        submit: "submit"
-        reset: "reset"
-    }
-
-    Width :: enum {
-        auto
-        full: "full-width"
-    }
-    
     // NOTE: properties default to first item in enum, unless explicitly set.
-    :: properties {
-        // NOTE(Jake): Might add a "private"/"readonly"/"unsupported" block so you can declare some properties
-        //             as unsupported. This will mean users *can* change the values but it'll cause a compile 
-        //             warning saying "[x] property is unsupported and future updates might break this component"
-        namespace := 'btn' // (optional, will default to component name, ie. "Button")
-        primaryColor := "red" // NOTE: Might want to make a `Colors` enum for standard lib.
-
-        kind: Kind
-        type: Type
-        width: Width = full
+    :: struct {
+        kind: enum {
+            "primary"
+            "secondary"
+        }
+        type: enum {
+            "button"
+            "submit"
+            "reset"
+        }
+        width: enum {
+            "auto"
+            "full"
+        } = "full"
     }
 
+    // NOTE: Currently it does not have access to `:: struct` variables as I'm not sure adding
+    //       that complexity is a good idea yet.
+    //
+    //       Semicolons aren't required to end property statements currently, but that feature
+    //       has added a bit of complexity to the CSS parser, so not sure if it's worth it.
+    //
     :: css {
-        // NOTE(Jake): Access component properties in a CSS4 variables way.
-        var(--namespace) {
-
-        }
+        test := "red"
 
         .primary {
-            // ...
+            color: test
         }
 
         .secondary {
@@ -108,39 +107,38 @@ Button :: html {
 
         .primary:hover,
         .primary:focus,
-        .primary.is-active {
+        .primary.is-active, {
             // ...
         }
     }
 
-    // Idea: Add special compile hints to CSS selectors, one idea might be to
-    //       restrict CSS properties to a list of enumerated values to catch improperly
-    //       set values.
-    :: css_rules {
+    // Idea: Tell the compiler to do certain operations / etc based on classnames.
+    :: css_config {
+        .js-component-button,
         .is-active {
-            // NOTE(Jake): Tells the compiler to not optimize this out or change it's name. This is so
-            //             the classname can be used in JavaScript and so the CSS rules aren't optimized out 
-            //             if unused.
-            dont_modify := true
+            // NOTE(Jake): Tells the compiler to not prefix this class with a namespace
+            //             ie. without this, output CSS will be ".Button_is-active" rather than ".is-active"
+            //
+            //             You might want this for specific classes to make interfacing with JavaScript easier.
+            //             ie. 
+            //
+            namespace := false
         }
     }
 
-    classes := []
-    classes[] = namespace
-    classes[] = kind
-    classes[] = width
-
-    // NOTE: Implicitly explode array into string for "class" property.
-    //       Might be exposed as function so you can explictily do "array.toClassString()"
-    button(class=classes, type=type) {
+    button(class="js-component-button "+kind+" "+width, type=type) {
         children // will insert child nodes here
     }
+
+    // Example HTML Output
+    // <button class="Button_primary Button_full" type="button" />
 }
 ```
 
 ```c
 Normalize :: css {
     // Imagine a typical normalize.css file here
+    // See "css_files" config below for example of how this gets included.
 }
 ```
 
@@ -152,7 +150,10 @@ html {
         meta(name="viewport", content="width=device-width")
         meta(http-equiv="Content-Type", content="text/html; charset=utf-8")
         meta(http-equiv="X-UA-Compatible", content="IE=edge,chrome=1")
-        script(type="text/javascript") {`
+        script(type="text/javascript") {
+            // NOTE: Since JavaScript parsing isn't going to be supported by the compiler yet, just pass
+            //       in a HereDoc string of the JavaScript.
+            """
             var _gaq = _gaq || [];
             _gaq.push(['_setAccount', 'UA-XXXXX-X']);
             _gaq.push(['_trackPageview']);
@@ -162,18 +163,17 @@ html {
             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
             })();
-        `}
+            """
+        }
     }
     body {
-        footer_widths := Button.Width.full
+        footer_widths := "full"
 
         div {
-            Button(kind=primary, type=reset) {
-                "Clear"
+            Button(kind=primary, type=reset) { 
+                "Clear" 
             }
-            // NOTE(Jake): Because these params are for a `Button` component, you don't need 
-            //             to do "Button.Kind.secondary" (though you could), you can just do "Kind.secondary"
-            Button(kind=Kind.secondary, width=Width.full, type=Type.submit){
+            Button(kind="secondary", width="full", type="submit"){
                 "Submit"
             }
         }
@@ -263,6 +263,8 @@ The language will come with a few standard language definition files to allow co
 It's unclear how this should look so far so to begin with language support will probably be hardcoded into the code generation
 part of the compiler.
 
+The idea is that the compiler will be able to output the CSS and the views in the form of PHP templates, React component views, etc.
+
 ```
 HTML :: language {
     support_interop: false
@@ -272,7 +274,15 @@ PHP :: language {
     support_interop: true
 }
 
-JavaScript :: language {
+Silverstripe :: language {
+    support_interop: true
+}
+
+JavaScript_React :: language {
+    support_interop: true
+}
+
+Elm :: language {
     support_interop: true
 }
 ```
