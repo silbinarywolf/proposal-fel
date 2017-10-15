@@ -29,7 +29,7 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
 
 ## Roadmap plan:
 
-To avoid constantly increasing scope and never properly finish implementing features, the following link 
+To avoid constantly increasing scope and never finishing features, the following link 
 shows my plan for features and what version numbers they'll be at.
 
 This will be updated as I go.
