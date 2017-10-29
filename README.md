@@ -5,7 +5,7 @@ Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML /
 ## Goals:
 
 - A coupled replacement for Twig and SASS, combined into one compiler.
-    - We are *not* thinking too hard about JavaScript integration with components yet.
+    - We are *not* thinking too hard about JavaScript integration with components yet. I have explored embedding [Goja](https://github.com/dop251/goja) and parsing JavaScript with it, so handling `:: javascript` definitions isn't out of the question.
 - Fast and simple analysis of unused CSS selectors and optional optimization.
     - Optimization ideas:
         - Reduce CSS selector string sizes (where not marked for use in JavaScript)
@@ -116,13 +116,15 @@ Button :: html {
     :: css_config {
         .js-component-button,
         .is-active {
-            // NOTE(Jake): Tells the compiler to not prefix this class with a namespace
-            //             ie. without this, output CSS will be ".Button_is-active" rather than ".is-active"
+            // NOTE(Jake): Tells the compiler to not prefix this class with a namespace or optimize the rule
+            //             away if it's unused at compile-time.
+            //
+            //             ie. without this, output CSS will be ".Button__is-active" rather than ".is-active"
             //
             //             You might want this for specific classes to make interfacing with JavaScript easier.
-            //             ie. 
+            //             ie. jQuery(".Button").addClass("is-active")
             //
-            namespace := false
+            modify := false
         }
     }
 
@@ -131,7 +133,7 @@ Button :: html {
     }
 
     // Example HTML Output
-    // <button class="Button_primary Button_full" type="button" />
+    // <button class="Button_primary Button_full" type="button"></button>
 }
 ```
 
@@ -139,6 +141,118 @@ Button :: html {
 Normalize :: css {
     // Imagine a typical normalize.css file here
     // See "css_files" config below for example of how this gets included.
+}
+```
+
+```c
+Link :: html {
+    :: struct {
+        url: string
+    }
+
+    // NOTE: Only have wrapping <a> tag if url is a non-empty string.
+    a(href=url) if url {
+        children
+    }
+}
+
+Link :: html {
+    :: struct {
+        url: string
+    }
+
+    // NOTE: Will have same HTML output as above Link example.
+    if url {
+        a(href=url) {
+            children
+        }
+    } else {
+        children
+    }
+}
+```
+
+```c
+FontAwesomeIconName :: enum {
+    // ... long list of icon names ...
+    "facebook"
+    "twitter"
+    // ... more icon names ...
+}
+
+SocialLink :: struct {
+    title: string
+    url: string
+    icon: FontAwesomeIconName
+}
+
+socialLinks := []SocialLink{
+    {
+        title: "Facebook",
+        url: "www.facebook.com",
+        icon: "facebook",
+    },
+    {
+        title: "Twitter",
+        url: "www.twitter.com",
+        icon: "facebook",
+    }
+}
+
+html {
+    head{
+        // ...
+    }
+    body {
+        // Reasoning: 1) Doesn't change the scope so you need to use "Top"/"Up" variables
+        //               like most programming languages.
+        //
+        //            2) When scanning/skimming code, spotting an "it" will immediately 
+        //               hint to you that you're reading code that is in a for-loop.
+        //
+
+        // Iterator Loop, implicit iterator value (`it`)
+        for socialLinks {
+            Link(url=it.url) {
+                i(class="fa fa-"+it.icon)
+                it.title // Print `title`
+            }
+        }
+        // Iterator Loop, explicit iterator value
+        for link := socialLinks {
+            Link(url=link.url) {
+                i(class="fa fa-"+link.icon)
+                link.title // Print `title`
+            }
+        }
+        // Iterator Loop, explicit index (i, zero-indexed) and iterator (socialLink) value
+        for i, link := socialLinks {
+            // NOTE: I do like template languages with "first" and "last", but
+            //       I'm not convinced the syntactic-sugar is that helpful, and by forcing
+            //       users to be explicit like below, over and over, it'll help solidify their
+            //       knowledge of working with zero-based arrays.
+            if i == 0 || i == len(socialLinks)-1 {
+                div(class="clearfix"){}
+            }
+            Link(url=link.url) {
+                i(class="fa fa-"+link.icon)
+                link.title // Print `title`
+            }
+        }
+        // Traditional Loop
+        for i := 0; i < len(socialLinks); i++ {
+            link := socialLinks[i]
+            Link(url=link.url) {
+                i(class="fa fa-"+link.icon)
+                link.title // Print `title`
+            }
+        }
+        // Not sure if anyone would *ever* need a while(true) loop for templates.
+        while (true) {
+            Link(url="www.google.com") {
+            }
+        }
+    }
 }
 ```
 
@@ -153,6 +267,13 @@ html {
         script(type="text/javascript") {
             // NOTE: Since JavaScript parsing isn't going to be supported by the compiler yet, just pass
             //       in a HereDoc string of the JavaScript.
+            //
+            //       We are using """ (Python-style) instead of ` (Golang-style) because JavaScript/ES6 is using `
+            //       for template literals: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
+            //
+            //       It's also way less likely to collide with a real giant chunk of raw text. I can't imagine any real-world
+            //       case where someone uses """.
+            //
             """
             var _gaq = _gaq || [];
             _gaq.push(['_setAccount', 'UA-XXXXX-X']);
@@ -263,7 +384,8 @@ The language will come with a few standard language definition files to allow co
 It's unclear how this should look so far so to begin with language support will probably be hardcoded into the code generation
 part of the compiler.
 
-The idea is that the compiler will be able to output the CSS and the views in the form of PHP templates, React component views, etc.
+The idea is that the compiler will be able to output the views in the form of PHP templates, React component views, etc.
+I've put together a simplistic idea of how it might work below, but this will need to be battle-tested against real languages.
 
 ```
 HTML :: language {
@@ -272,14 +394,54 @@ HTML :: language {
 
 PHP :: language {
     support_interop: true
+    if_begin: "if (%conditional) {"
+    if_end: "}"
+    for_begin: "for (%begin; %conditional; %statement) {"
+    for_end: "}"
+    for_it_begin: "foreach (%array as %it) {"
+    for_it_end: "}"
+    for_index_and_it_begin: "foreach (%array as %index => %it) {"
+    for_index_and_it_begin: "}"
+    for_continue: "continue;"
+    for_break: "break;"
 }
 
 Silverstripe :: language {
     support_interop: true
+    if_begin: "<% if %conditional %>"
+    if_end: "<% end_if %>"
+    //
+    // No equivalents for <% loop %>.
+    //
+    // Might just target PHP / Twig, then write a Silverstripe-Twig template
+    // module.
+    //
+    // Alternatively, extend Silverstripe template language to allow for-loop
+    //
+    for_begin: ""
+    for_end: ""
+    for_it_begin: ""
+    for_it_end: ""
+    for_index_and_it_begin: ""
+    for_index_and_it_begin: ""
+    for_continue: ""
+    for_break: ""
 }
 
 JavaScript_React :: language {
     support_interop: true
+    if_begin: "{ !!(%conditional) &&"
+    if_end: "}"
+    for_begin: "for (%begin; %conditional; %statement) {"
+    for_end: "}"
+    // NOTE: This will probably end up generating "for (%it of $array)" instead in
+    //       an idiomatic way so you can control the loop with "continue"/"break"
+    for_it_begin: "{ %array.map((%it) => {"
+    for_it_end: "}) }"
+    for_index_and_it_begin: "{ %array.map((%it, %index) => {"
+    for_index_and_it_begin: "}) }"
+    for_continue: ""
+    for_break: ""
 }
 
 Elm :: language {
