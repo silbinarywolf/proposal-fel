@@ -29,11 +29,15 @@
 - [x] Add tests for css optimization + setup Travis CI
 
 ## v0.7
-- Add if / for-loop support
+- [x] Re-write type system to be more flexible.
+	- [x] Add array support for primitive types.
+- [x] Add if / else / else if support
+- [x] Add for-each loop support
+	- No longer adding implicit iterators. I feel it's not very clear or useful.
+- Add for loop support
+- Add array index accessing (ie. myarr := []string{"test"}; otherval := myarr[0])
 
 ## v0.x
-- Re-write type system 
-	- Currently hardcoded enum/ints, needs to be more flexible to allow for custom types, ie. map[string]TypeInfo
 - Improve `data/html_query.go` HasSelectorPartMatch() function.
 	- Add support for more attribute operators (update `parser/typecheck.go` to enforce only supported attribute operators)
 - Update data.HTMLNode to be 1-1 with JavaScript property names.
