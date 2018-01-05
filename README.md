@@ -283,8 +283,12 @@ export function Link(props: Props) {
     }
     return this.children
 }
+```
 
 ## Templates
+
+These are files that can be output 1-1 in the folder of the developers choosing.
+The use case for this functionality is SilverStripe, Wordpress and Drupal templates.
 
 ```c
 html {
