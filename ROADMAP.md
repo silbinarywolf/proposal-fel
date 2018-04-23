@@ -34,6 +34,9 @@
 - [x] Add if / else / else if support
 - [x] Add for-each loop support
 	- No longer adding implicit iterators. I feel it's not very clear or useful.
+- [x] Rewrite large sections of code to use typechecker, emitter and vm for execution of code.
+
+## v0.8
 - Add for loop support
 - Add array index accessing (ie. myarr := []string{"test"}; otherval := myarr[0])
 
