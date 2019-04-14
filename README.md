@@ -1,488 +1,182 @@
-# Front-End Language
+# Front-End Language Reliability Tool
 
-Disclaimer: These are all work-in-progress ideas on what a strongly-typed HTML / CSS language might look like. I invite criticisms and the pointing out of flaws for this hypothetical language.
+**Disclaimer:** This intent of this document is to discuss ways to improve upon existing build tools in a pragmatic but positive manner. If anything is unclear or if you have any questions, please raise them as a Github issue.
 
-## Goals:
+## What are the primary problems we want to solve?
 
-- Blazing fast and simple analysis of unused CSS selectors and **maybe** optional classname optimization.
-    - Optimization ideas:
-        - Completely remove unused CSS rules from output and/or warn about them
-            - ie. If the element `<abbr>` is unused in the project and global CSS styling exists for `abbr {}`
-                  it will be removed.
-        - Reduce or hash CSS selector string sizes (where not marked for use in JavaScript or other frontend code)
-            - ie. Transform ".Button_primary" to ".x45dt". This will reduce CSS filesize and potentially alleviate browser string allocations / comparisons.
-- A coupled replacement for template engines (Twig, Pug) and CSS preprocessors (SASS, LESS, Stylus), combined into one compiler.
-    - We are *not* thinking too hard about JavaScript integration with components yet. I have explored embedding [Goja](https://github.com/dop251/goja) and parsing JavaScript with it, so handling `:: javascript` definitions isn't out of the question. The path that will most likely be taken is outputting components as stateless views for React / Vue.js / similar.
-- Easy to reuse pure components
-- Can be used standalone (ie. generate static HTML) and can integrate seamlessly with other build systems (ie. Webpack, Laravel Mix, Brunch)
-- (Maybe) Define and detect browser bugs at compile-time.
-    - IE11    - Flex container not center nested elements if it has a min-height. User could be warned of this and told of workarounds via the compiler. (ie. wrap the container again) (source: https://github.com/philipwalton/flexbugs/issues/64)
-    - IE6/IE7 - Auto apply patch for "display: inline-block;". (ie. "*display: inline; zoom: 1;") (source: https://stackoverflow.com/questions/6544852/ie7-does-not-understand-display-inline-block)
+The loose decoupled nature of HTML and CSS makes it difficult to safely remove unused rules and determine what rules may conflict with each other. Not only that, but various browsers vendors such as Internet Explorer and Safari either lag behind the latest standards by half a decade or implement a feature erroneously, which pushes additional development effort to the website or web app developer.
 
-## Parsing Logic:
-- Semicolons (;) optional. This will be achieved by making newlines act as a statement terminator. (Like Golang)
-- Colons (:) used to mean 'declare' and colon equals (:=) means infer type from right-hand expression. (Like Golang)
-- Strings can be represented with: 
-    - " (regular strings)
-    - """ (for heredoc strings, ie. style/script data or inline HTML)
-    - ' (banned except for in CSS for now)
-- Identifiers declared with $ are backend interopable variables / functions.
-    - ie. $get_posts() in PHP will output `<?php get_posts(); ?>`
-    - ie. $this.props.value in JavaScript will output `this.props.value`
+We don't only want this tool to solve the above problems, but solve them well. This means a few things:
 
-## Roadmap plan:
+- It needs to be blazing fast. CSS preprocessors like SASS aren't very complex but seem to compile significantly slower than other build tools like the TypeScript compiler. For example, on a Windows machine, SASS might take 4 seconds to recompile in "watch mode" for a reasonably large project using a Bootstrap-sized framework.
+- It needs to be 100% backwards compatible. If it's installed globally on a developers machine, it should be easy to install the next version (eg. 1.1) but also be able to run the tool at an older version (eg. 1.0). The Go programming language claims to offer this feature using a ["-lang" flag](https://golang.org/doc/go1.12#compiler).
+- It should ideally have at least 2-3 deeply invested maintainers. Popular build tools like Webpack rely on third parties to maintain various plugins/loaders, which means it requires you trust not only the company funding Webpack but a bunch of individuals who can only devote so much free time to fixing problems or keeping it up to date with Webpack.
 
-To avoid constantly increasing scope and never finishing features, the following link 
-shows my plan for features and what version numbers they'll be at.
+## Who do we want to solve these problems for?
 
-This will be updated as I go.
+We want to solve this problem in a way that will be a good fit for both large JavaScript build tool projects as well as for a time and budget-constrained work.
 
-[Roadmap](ROADMAP.md)
+If you aren't aware, to get an idea of the time constraints some web developers are under, especially beginners, Im talking about projects that have about 45-90 hours of _total_ budget. That means a CMS backend with modules or plugins needs to be setup, the frontend needs to be built and then finally all that code needs to be put on a remote server in 2 weeks.
 
-## Rules
-- Keywords: (These can be escaped with a \\, ie, if you want a HTML element called "if", do \\if)
-    - import
-    - Control flow:
-        - if
-        - for (do the Golang thing, one keyword for looping)
-    - Types:
-        - string
-        - enum
-        - int (defaults to highest integer type for that operating system, most likely 64-bit)
-        - float (defaults to highest floating point type for that operating system, most likely 64-bit)
-        - bool
-            - false
-            - true
-        - type\[\] (Array of type)
-        - interop
-            - this is essentially a $ variable that can't be known about 
-              at compile time. Unfortunately a "mixed"/"any" type.
+Another consideration is quick quoted work that can take anywhere between 1 to 6 hours. If you quote a client with 6 hours of work, then you most likely aren't going to be able to prioritize HTML and CSS cleanliness if you underestimated the effort. However, having a tool that just tells you what's unused or that could just cleanup unused rules for you, would save a lot of time and improve readability.
 
-## Conventions
-- A component should begin with a captial letter
-    - Reasoning: Make it clearer when using a regular tag vs a component, ie. "button" vs "Button"
-                 and less likely to clash with potential future elements.
+## What are some existing solutions to these problems?
 
-## Reusable Components
+Before considering building yet another tool, we should look around and see if there's anything out there that will be able to solve the problems we have.
 
-```c
-Button :: html {
-    // NOTE: properties default to first item in enum, unless explicitly set.
-    :: struct {
-        kind: enum {
-            "primary"
-            "secondary"
-        }
-        type: enum {
-            "button"
-            "submit"
-            "reset"
-        }
-        width: enum {
-            "auto"
-            "full"
-        } = "full"
-    }
+One common thing I've listed as a "Con" below is the reliance on a JavaScript build tools. The reason for this is that in my experience when doing budget-constrained work, you don't have time to deal with the inertia and unreliability that comes from using these tools.
 
-    // NOTE: Currently it does not have access to `:: struct` variables as I'm not sure adding
-    //       that complexity is a good idea yet.
-    //
-    //       Semicolons aren't required to end property statements currently, but that feature
-    //       has added a bit of complexity to the CSS parser, so not sure if it's worth it.
-    //
-    :: css {
-        test := "red"
+### Determine what CSS rules are actually used by a project
 
-        .primary {
-            color: test
-        }
+Here are a list of tools or resources that help assist you in finding what CSS rules are being used.
 
-        .secondary {
-            // ...
-        }
+#### Chrome DevTools Audit
 
-        .primary:hover,
-        .primary:focus,
-        .primary.is-active, {
-            // ...
-        }
-    }
+A tool built-in to the Chrome web browser which can help you discover unused CSS styles.
 
-    // Idea: Tell the compiler to do certain operations / etc based on classnames.
-    :: css_config {
-        .js-component-button,
-        .is-active {
-            // NOTE(Jake): Tells the compiler to not prefix this class with a namespace or optimize the rule
-            //             away if it's unused at compile-time.
-            //
-            //             ie. without this, output CSS will be ".Button__is-active" rather than ".is-active"
-            //
-            //             You might want this for specific classes to make interfacing with JavaScript easier.
-            //             ie. jQuery(".Button").addClass("is-active")
-            //
-            modify := false
-        }
-    }
+**Pros**
 
-    button(class="js-component-button "+kind+" "+width, type=type) {
-        children // will insert child nodes here
-    }
+- 100% accuracy
 
-    // Example HTML Output
-    // <button class="Button_primary Button_full" type="button"></button>
+**Cons:**
+
+- Requires loading each page and all its possible variants, ie. if a client can modify a banner to have different styling, that variant needs to be tested. This takes time!
+
+#### Typed CSS modules or similar
+
+Tools that integrate with a JavaScript Build System and generate identifiers so that when a CSS rule is removed, a variable will become undefined thats tied to that CSS rule.
+
+**Implementations:**
+
+- [https://github.com/seek-oss/css-modules-typescript-loader](https://github.com/seek-oss/css-modules-typescript-loader)
+- [https://github.com/Quramy/typed-css-modules](https://github.com/Quramy/typed-css-modules)
+
+**Pros:**
+
+- Generate constants from CSS files so that your JavaScript build will fail if you're attempting to use a rule that was removed.
+
+**Cons:**
+
+- Assumes you're building an application or using a build tool. Not helpful for those with legacy HTML/CSS code or those building Wordpress sites.
+
+#### PurifyCSS
+
+**Pros:**
+
+- Can process HTML, JS and PHP to see what classes are used/unused.
+
+**Cons:**
+
+- [Project is no longer maintained.](https://github.com/purifycss/purifycss/issues/213)
+- Assumes you're using a build tool like Gulp, Grunt or Webpack. Would require the user have Node installed.
+- Requires manually specifying the files you want to scan. Ideally, we want something that will "just work".
+
+### Stop CSS rules from conflicting
+
+Here are a list of practices or tools that were designed to stop CSS classnames from conflicting with each other and that also keep [CSS specificity](https://developer.mozilla.org/en-US/docs/Web/CSS/Specificity) low, which is helps reduce cognitive complexity.
+
+#### CSS Modules
+
+**Pros**
+
+- Stops CSS conflicting by namespacing
+- Keep CSS specificity low
+- Not a process. The tool automatically namespaces your rules for you, less room for error.
+
+**Cons**
+
+-  Requires a JavaScript build tool like Webpack
+
+#### [BEM Convention](http://getbem.com/)
+
+**Pros**
+
+- Stops CSS conflicting by namespacing
+- Keep CSS specificity low
+
+**Cons**
+
+- Unintuitive and hard to understand. We base this on personal experience where  either a client has provided frontend where BEM wasn't followed properly or where teams with not much experience in frontend get it wrong. We don't see this as a failing of developer, but rather the unintuitive aesthetic of BEM itself.
+
+### What CSS properties or features have erroneous behaviour in certain browsers
+
+Here are a list of tools or resources that help assist you in finding what CSS rules are supported.
+
+#### CanIUse
+
+A website that will tell you what features are either partially or fully supported in a browser.
+
+**Pros**
+
+- Informs you of partial implementations that may differ or have buggy behaviour when compared to the W3C spec.
+
+**Cons**
+
+- Not a built-in tool, which makes it easy to accidentally use a bleeding edge CSS feature without realizing.
+  - **Side Note:** Manual testing in your target browsers would help avoid this but unfortunately we have rarely seen developers test in those browsers either due to lack of physical ownership (iPhone), lack of knowledge on how to test older Internet Explorer in a VM or laziness.
+
+## How do we solve this problem
+
+Now that we've defined at least some problems, let's looks at some things that our tool will need to be able to solve.
+
+### Nested CSS
+
+In a legacy HTML or CSS project, nested CSS is definitely going to exist in the project. By nested CSS, we mean a selector such as ".myElement .myOtherElement". Due to the nature of various legacy systems and also with how Wordpress works, this tool is going to need to be able to reason about how templates include other templates so that it is able to build an accurate model of the varying HTML structures to see if that CSS rule is used or not.
+
+This becomes more complicated as different backend configurations could completely change what CSS classes get rendered. If a user has a website wherein a client is configuring CSS classes directly and storing them in a database, we are limited in how much an external tool can reason about what is used / unused. 
+
+ie.
+```php
+<div class="<?php echo $myClasses; ?>"></div>
+```
+
+_$myClass came from a MySQL database or something that we have no control over._
+
+One solution to this problem is that a user could add additional code so that a tool could reason about what classes exist in scope.
+
+```php
+<?php
+$classesAvailable = [
+  “button” => true,
+  “button-primary” => true,
+];
+// Split string of classes into an array of class names.
+$classes = preg_split('/\s+/', $myClasses, -1, PREG_SPLIT_NO_EMPTY);
+$myClassesValidated = “”;
+foreach ($classes as $class) {
+  if (isset($classesAvailable[$class])) {
+    $myClassesValidated .= $class;
+  }
+}
+?>
+<div class=”<?php echo $myClassesValidated; ?>”>
+</div>
+```
+
+_By doing the more verbose approach above, we've given the compiler enough information to know that $myClassesValidated can only have up to 2 classes, "button" and "button-primary"._
+
+Another solution is that within our CSS, we simply add a note that states that we don't want the compiler to check if that rule is used or not. This would also be useful for stateful CSS classes that the tool might not be able to reason about. Ie. JavaScript applied classes
+
+```css
+// fel:unchecked
+.button {
+  display: block;
 }
 ```
 
-```c
-Normalize :: css {
-    // Imagine a typical normalize.css file here
-    // See "css_files" config below for example of how this gets included.
-}
-```
+_Linting tools such as TypeScript Lint allow you to ignore rules certain properties / patterns with a code comment._
 
-```c
-Link :: html {
-    :: struct {
-        url: string
-    }
+Finally, we could avoid needing to get an accurate model of the HTML by forcing developers to use something like [BEM](http://getbem.com/introduction/) or [CSS Modules](https://github.com/css-modules/css-modules), wherein they keep rules simply by only targeting 1 class without nesting.
 
-    // NOTE: Only have wrapping <a> tag if url is a non-empty string.
-    a(href=url) if url {
-        children
-    }
-}
+### Framework / Language Agnostic
 
-Link :: html {
-    :: struct {
-        url: string
-    }
+**Use cases for our tool**
 
-    // NOTE: Will have same HTML output as above Link example.
-    if url {
-        a(href=url) {
-            children
-        }
-    } else {
-        children
-    }
-}
-```
+- A Wordpress project that is made up of PHP, JavaScript and CSS/SASS files.
+- A TypeScript React application that is made up of TypeScript files and pre-processed CSS files (most likely SASS as it seems to the most popular)
+- A SilverStripe project is going to be up of PHP, SS templates (it's own template format!), JavaScript and CSS.
+- A Go project made up of Go files, HTML templates (handlebar pre-processing), JavaScript and CSS.
 
-```c
-FontAwesomeIconName :: enum {
-    // ... long list of icon names ...
-    "facebook"
-    "twitter"
-    // ... more icon names ...
-}
+To keep code written in this tool stable and reliable with minimal complexity, simply reading or validating multiple file formats seems out of the question. New features are being added to PHP, JavaScript and TypeScript all the time which could break the parser of our hypothetical tool. If this tool is to have strong backwards compatibility, it will most likely need its own format for templating that can at least target PHP, JavaScript and TypeScript. Ideally it would give it's users the ability to target whatever esoteric template language it needs to.
 
-SocialLink :: struct {
-    title: string
-    url: string
-    icon: FontAwesomeIconName
-}
-
-socialLinks := []SocialLink{
-    {
-        title: "Facebook",
-        url: "www.facebook.com",
-        icon: "facebook",
-    },
-    {
-        title: "Twitter",
-        url: "www.twitter.com",
-        icon: "facebook",
-    }
-}
-
-html {
-    head{
-        // ...
-    }
-    body {
-        // Reasoning: 1) Doesn't change the scope so you need to use "Top"/"Up" variables
-        //               like most programming languages.
-        //
-        //            2) When scanning/skimming code, spotting an "it" will immediately 
-        //               hint to you that you're reading code that is in a for-loop.
-        //
-
-        // Iterator Loop
-        for link := socialLinks {
-            Link(url=link.url) {
-                i(class="fa fa-"+link.icon)
-                link.title // Print `title`
-            }
-        }
-        // Iterator Loop, explicit index (i, zero-indexed) and iterator (socialLink) value
-        for i, link := socialLinks {
-            // NOTE: I do like template languages with "first" and "last", but
-            //       I'm not convinced the syntactic-sugar is that helpful, and by forcing
-            //       users to be explicit like below, over and over, it'll help solidify their
-            //       knowledge of working with zero-based arrays.
-            if i == 0 || i == len(socialLinks)-1 {
-                div(class="clearfix"){}
-            }
-            Link(url=link.url) {
-                i(class="fa fa-"+link.icon)
-                link.title // Print `title`
-            }
-        }
-        // Traditional Loop
-        for i := 0; i < len(socialLinks); i++ {
-            link := socialLinks[i]
-            Link(url=link.url) {
-                i(class="fa fa-"+link.icon)
-                link.title // Print `title`
-            }
-        }
-        // Not sure if anyone would *ever* need a while(true)-like loop for templates.
-        for true {
-            Link(url="www.google.com") {
-            }
-        }
-    }
-}
-```
-
-## Component output to TypeScript
-
-This is simple example of how component outputting might work. 
-The idea is your view components can be output to the language / virtual-dom framework of your choice.
-
-```c
-/**
- * This was automatically generated by FEL compiler.
- * Do not edit.
- */
-
-import * as React from 'react';
-
-interface Props {
-    url: string
-    children: React.ReactNode
-}
-
-export function Link(props: Props) {
-    // NOTE(Jake): 2018-01-05
-    //
-    // The code below will most likely generate "React.createElement" calls 
-    // rather than JSX/HTML and track a result node variable ("n")
-    // so "wrapped element" if-statements can be handled without
-    // code duplication.
-    //
-    // tl;dr: This output wont be as readable but file size / performance should
-    //        be optimal.
-    //
-    if (url) {
-        return (
-            <a href={url}>
-                { this.children }
-            </a>
-        )
-    }
-    return this.children
-}
-```
-
-## Templates
-
-These are files that can be output 1-1 in the folder of the developers choosing.
-The use case for this functionality is SilverStripe, Wordpress and Drupal templates.
-
-```c
-html {
-    head {
-        meta(name="viewport", content="width=device-width")
-        meta(http-equiv="Content-Type", content="text/html; charset=utf-8")
-        meta(http-equiv="X-UA-Compatible", content="IE=edge,chrome=1")
-        script(type="text/javascript") {
-            // NOTE: Since JavaScript parsing isn't going to be supported by the compiler yet, just pass
-            //       in a HereDoc string of the JavaScript.
-            //
-            //       We are using """ (Python-style) instead of ` (Golang-style) because JavaScript/ES6 is using `
-            //       for template literals: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
-            //
-            //       It's also way less likely to collide with a real giant chunk of raw text. I can't imagine any real-world
-            //       case where someone uses """.
-            //
-            """
-            var _gaq = _gaq || [];
-            _gaq.push(['_setAccount', 'UA-XXXXX-X']);
-            _gaq.push(['_trackPageview']);
-
-            (function() {
-            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-            })();
-            """
-        }
-    }
-    body {
-        footer_widths := "full"
-
-        div {
-            Button(kind=primary, type=reset) { 
-                "Clear" 
-            }
-            Button(kind="secondary", width="full", type="submit"){
-                "Submit"
-            }
-        }
-        footer {
-            Button(width=footer_widths) {
-                "Open Something Cool!"
-            }
-        }
-    }
-}
-```
-
-## Example code structure in directory
-
-```
-- /project_folder/
-    - /fel/
-        - /includes/
-        - /templates/
-        - config.fel
-    - /css/
-    - /templates/
-```
-
-## Config
-
-```c
-// Idea: You can put a heap of Bootstrap components in a 'Bootstrap' folder
-//       which will automatically namespace each object so you have to do "Bootstrap.Button".
-//
-//       However, I feel you generally just want to be able to use any component in your project without
-//       worrying about namespaces for the most part, so not sure how necessary this would be.
-//
-namespace_directory := 'modules'
-
-css_output_directory := '../css'
-
-// Idea: Define a directory to output components as React/Vue.js/Elm stateless/pure components
-//       so they can be used in web apps.
-component_view_language = 'typescript'
-component_view_framework = 'react'
-component_view_output_directory = '../javascript/views'
-
-// Idea: You can target a backend language to output to
-backend_language := Language.PHP // ie. Language.HTML, Language.JavaScript
-
-// NOTE(Jake): Where to output HTML / PHP / JavaScript, depending on `backendLanguage`
-//             This is a 1-1 mapping, so if you made "Page.fel" it would output in /templates/Page.php
-template_directory := {
-    "templates": "../templates"
-}
-
-// Idea: Inspired by Brunch, declare where you want CSS of specific modules/components to be output to.
-//
-//       If you are actually using another build system with this like Webpack/Brunch, perhaps the CSS output
-//       can be configured at that level.
-//
-css_files := [
-    "normalize.css": [
-        Normalize
-    ],
-    "main.css": [] // empty array implies put in all CSS that isn't placed elsewhere.
-]
-
-// Idea: Define target browsers so 'css_rules' can be applied to warn of browser bugs as well as generate
-//       vendor prefixes for properties.
-Browser := {
-    Internet_Explorer: 9,
-    Edge: 14,
-    Safari: 8,
-    Safari_IOS: 10,
-    Chrome: 60,
-    Chrome_Android: 59,
-    Opera: 30,
-    Firefox: 54,
-}
-```
-
-## Browser Rules / Vendor Prefixes
-```
-if Browser.Safari < 9 {
-    // NOTE(Jake): Declare vendor prefixes based on browser being targetted
-    :: css_vendor_prefix {
-        transition: -webkit-transition
-    }
-}
-```
-
-## Language Definition
-
-The language will come with a few standard language definition files to allow configuration of backend interoperation.
-
-It's unclear how this should look so far so to begin with language support will probably be hardcoded into the code generation
-part of the compiler.
-
-The idea is that the compiler will be able to output the views in the form of PHP templates, React component views, etc.
-I've put together a simplistic idea of how it might work below, but this will need to be battle-tested against real languages.
-
-```
-HTML :: language {
-    support_interop: false
-}
-
-PHP :: language {
-    support_interop: true
-    if_begin: "if (%conditional) {"
-    if_end: "}"
-    for_begin: "for (%begin; %conditional; %statement) {"
-    for_end: "}"
-    for_it_begin: "foreach (%array as %it) {"
-    for_it_end: "}"
-    for_index_and_it_begin: "foreach (%array as %index => %it) {"
-    for_index_and_it_begin: "}"
-    for_continue: "continue;"
-    for_break: "break;"
-}
-
-Silverstripe :: language {
-    support_interop: true
-    if_begin: "<% if %conditional %>"
-    if_end: "<% end_if %>"
-    //
-    // No equivalents for <% loop %>.
-    //
-    // Might just target PHP / Twig, then write a Silverstripe-Twig template
-    // module.
-    //
-    // Alternatively, extend Silverstripe template language to allow for-loop
-    //
-    for_begin: ""
-    for_end: ""
-    for_it_begin: ""
-    for_it_end: ""
-    for_index_and_it_begin: ""
-    for_index_and_it_begin: ""
-    for_continue: ""
-    for_break: ""
-}
-
-JavaScript_React :: language {
-    support_interop: true
-    if_begin: "{ !!(%conditional) &&"
-    if_end: "}"
-    for_begin: "for (%begin; %conditional; %statement) {"
-    for_end: "}"
-    // NOTE: This will probably end up generating "for (%it of $array)" instead in
-    //       an idiomatic way so you can control the loop with "continue"/"break"
-    for_it_begin: "{ %array.map((%it) => {"
-    for_it_end: "}) }"
-    for_index_and_it_begin: "{ %array.map((%it, %index) => {"
-    for_index_and_it_begin: "}) }"
-    for_continue: ""
-    for_break: ""
-}
-
-Elm :: language {
-    support_interop: true
-}
-```
+However, just because we may need our own template parser, that doesn't mean it needs to be its own special esoteric syntax or language. Infact, just using HTML with something simple like [Mustache](https://mustache.github.io/) template syntax might be all we want.
