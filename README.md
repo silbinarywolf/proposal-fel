@@ -74,7 +74,7 @@ Tools that integrate with a JavaScript Build System and generate identifiers so 
 
 ### Stop CSS rules from conflicting
 
-Here are a list of practices or tools that were designed to stop CSS classnames from conflicting with each other and that also keep [CSS specificity](https://developer.mozilla.org/en-US/docs/Web/CSS/Specificity) low, which is helps reduce cognitive complexity.
+Here are a list of practices or tools that were designed to stop CSS classnames from conflicting with each other and that also keep [CSS specificity](https://developer.mozilla.org/en-US/docs/Web/CSS/Specificity) low, which helps reduce cognitive complexity.
 
 #### CSS Modules
 
@@ -86,7 +86,7 @@ Here are a list of practices or tools that were designed to stop CSS classnames 
 
 **Cons**
 
--  Requires a JavaScript build tool like Webpack
+- Requires a JavaScript build tool like Webpack
 
 #### [BEM Convention](http://getbem.com/)
 
