@@ -10,7 +10,8 @@ We don't only want this tool to solve the above problems, but solve them well. T
 
 - It needs to be blazing fast. CSS preprocessors like SASS aren't very complex but seem to compile significantly slower than other build tools like the TypeScript compiler. For example, on a Windows machine, SASS might take 4 seconds to recompile in "watch mode" for a reasonably large project using a Bootstrap-sized framework.
 - It needs to be 100% backwards compatible. If it's installed globally on a developers machine, it should be easy to install the next version (eg. 1.1) but also be able to run the tool at an older version (eg. 1.0). The Go programming language claims to offer this feature using a ["-lang" flag](https://golang.org/doc/go1.12#compiler).
-- It should ideally have at least 2-3 deeply invested maintainers. Popular build tools like Webpack rely on third parties to maintain various plugins/loaders, which means it requires you trust not only the company funding Webpack but a bunch of individuals who can only devote so much free time to fixing problems or keeping it up to date with Webpack.
+- The tool should not rely on the user having Python, NodeJS or any other third-party dependency installed, it should work standalone. However, it should also be easy to integrate with existing build systems such as Webpack. We might want the Webpack version to be a JavaScript / WASM build of the tool as building native binaries like NodeSASS can cause problems with build servers and compose poorly with other tools like [Cypress](https://www.cypress.io/).
+- It should ideally always have at least 2-3 deeply invested maintainers so that the project isn't halted by a single author leaving the project.
 
 ## Who do we want to solve these problems for?
 
@@ -98,9 +99,22 @@ Here are a list of practices or tools that were designed to stop CSS classnames 
 
 - Unintuitive and hard to understand. We base this on personal experience where  either a client has provided frontend where BEM wasn't followed properly or where teams with not much experience in frontend get it wrong. We don't see this as a failing of developer, but rather the unintuitive aesthetic of BEM itself.
 
-### What CSS properties or features have erroneous behaviour in certain browsers
+### What HTML patterns or CSS features have erroneous behaviour in certain browsers
 
-Here are a list of tools or resources that help assist you in finding what CSS rules are supported.
+Here are a list of tools or resources that help assist you in finding what HTML is valid and what CSS rules are supported.
+
+#### W3C Markup Validation Service
+
+A [website](https://validator.w3.org/) that tells you whether your HTML is correct or not.
+
+**Pros**
+
+- Tells you whether your HTML is valid or not. 
+- Historically, this was very good at helping you figure out why Internet Explorer 6, 7 or 8 wasn't working, usually due to a unclosed or incorrectly closed tag.
+
+**Cons**
+
+- Not built-in. Requires you provide a live URL or paste HTML per-page.
 
 #### CanIUse
 
@@ -167,6 +181,25 @@ Another solution is that within our CSS, we simply add a note that states that w
 _Linting tools such as TypeScript Lint allow you to ignore rules certain properties / patterns with a code comment._
 
 Finally, we could avoid needing to get an accurate model of the HTML by forcing developers to use something like [BEM](http://getbem.com/introduction/) or [CSS Modules](https://github.com/css-modules/css-modules), wherein they keep rules simply by only targeting 1 class without nesting.
+
+### Built-in and custom rules
+
+There should be built-in rules to stop users from using incorrect HTML tags. For example, using an anchor link as a button should be banned by default, ie.
+```
+<a href="#" class="btn"></a>
+```
+Would recommend you switch to:
+```
+<button type="button" class="btn"></button>
+```
+or at the very least, apply the [button role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles/button_role).
+```
+<a href="#" class="btn" role="button"></a>
+```
+
+There could also either be built-in or user-defined CSS rules that assist with:
+- Warning the use of [viewport height units](https://bugs.webkit.org/show_bug.cgi?id=141832), as they don't work as expected on iOS.
+- Warning the use of position: absolute / relative without defining an explicit z-index. We've personally found that when you don't at least explicitly give a z-index of 0, you get unpredictable rendering order across browsers.
 
 ### Framework / Language Agnostic
 
